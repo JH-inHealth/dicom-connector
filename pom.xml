@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>edu.jh.pm</groupId>
+    <artifactId>dicom-connector</artifactId>
+    <version>4.1.0</version>
+    <packaging>mule-extension</packaging>
+    <name>Dicom Extension</name>
+
+    <parent>
+        <groupId>org.mule.extensions</groupId>
+        <artifactId>mule-modules-parent</artifactId>
+        <version>1.1.10</version>
+    </parent>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <java.version>8</java.version>
+        <jdk.version>8</jdk.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/dcm4che-core/maven-metadata.xml -->
+        <dcm4che.version>5.29.0</dcm4che.version>
+    </properties>
+
+    <dependencies>
+        <!-- DICOM -->
+        <dependency>
+            <groupId>org.dcm4che</groupId>
+            <artifactId>dcm4che-core</artifactId>
+            <version>${dcm4che.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.dcm4che</groupId>
+            <artifactId>dcm4che-net</artifactId>
+            <version>${dcm4che.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.dcm4che.tool</groupId>
+            <artifactId>dcm4che-tool-common</artifactId>
+            <version>${dcm4che.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-compress -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.21</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.1</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <repository>
+            <id>dcm4che</id>
+            <name>DCM4Che Repository</name>
+            <url>https://dcm4che.org/maven2/</url>
+        </repository>
+        <repository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>https://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+        </repository>
+    </repositories>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub JH-inHealth</name>
+            <url>https://maven.pkg.github.com/JH-inHealth/dicom-connector</url>
+            <layout>default</layout>
+        </repository>
+    </distributionManagement>
+</project>
