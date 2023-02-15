@@ -77,6 +77,11 @@ public class MuleFileStore implements MuleStore {
         if (!isTerm) executor.shutdown();
         if (compress.getLastException() != null) {
             Exception e = compress.getLastException();
+            try {
+                Files.deleteIfExists(Paths.get(this.outputFilePath));
+            } catch (IOException ignore) {
+                // Ignore this exception
+            }
             throw new IOException(e.getMessage(), e);
         } else {
             fileList.clear();
