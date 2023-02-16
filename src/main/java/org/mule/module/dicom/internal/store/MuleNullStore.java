@@ -20,6 +20,9 @@ public class MuleNullStore implements MuleStore {
     private static final Logger log = LoggerFactory.getLogger(MuleNullStore.class);
 
     @Override
+    public String getCurrentFileName() { return ""; }
+
+    @Override
     public boolean isNull() {
         return true;
     }

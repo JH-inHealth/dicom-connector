@@ -40,6 +40,10 @@ public class MuleFileStore implements MuleStore {
     private final CompressAsync compress;
     private final ExecutorService executor;
 
+    private String currentFileName;
+    @Override
+    public String getCurrentFileName() { return currentFileName; }
+
     public MuleFileStore(String outputFilePath, NotificationEmitter notificationEmitter, boolean compressFiles) throws IOException {
         String guid = UUID.randomUUID().toString();
         this.outputFilePath = Paths.get(outputFilePath, guid).toString();
@@ -77,6 +81,11 @@ public class MuleFileStore implements MuleStore {
         if (!isTerm) executor.shutdown();
         if (compress.getLastException() != null) {
             Exception e = compress.getLastException();
+            try {
+                Files.deleteIfExists(Paths.get(this.outputFilePath));
+            } catch (IOException ignore) {
+                // Ignore this exception
+            }
             throw new IOException(e.getMessage(), e);
         } else {
             fileList.clear();
@@ -102,6 +111,7 @@ public class MuleFileStore implements MuleStore {
         // Save to the file
         String guid = UUID.randomUUID().toString();
         Path file = Paths.get(outputFilePath, guid + ".dcm");
+        currentFileName = file.toString();
         try (OutputStream output = Files.newOutputStream(file, StandardOpenOption.CREATE)) {
             StoreUtils.writeTo(output, payload, fmi);
         }

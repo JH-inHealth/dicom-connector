@@ -15,6 +15,7 @@ import org.dcm4che3.net.PDVInputStream;
 import org.dcm4che3.net.pdu.PresentationContext;
 
 public interface MuleStore {
+    String getCurrentFileName();
     boolean isNull();
     void waitForFinish() throws IOException;
     List<String> getFileList();

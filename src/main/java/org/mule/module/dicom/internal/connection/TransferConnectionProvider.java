@@ -132,26 +132,7 @@ public class TransferConnectionProvider implements CachedConnectionProvider<Tran
         sourceConn.setIdleTimeout(sourceTimings.getIdleTimeout());
         sourceConn.setSocketCloseDelay(sourceTimings.getSocketCloseDelay());
 
-        ScuConnection targetConnection = new ScuConnection(localAetName, targetAetConnection, targetSecurity, targetTlsContext, scheduler);
-        Connection targetConn = targetConnection.getConnection();
-        // Set Buffers
-        targetConn.setMaxOpsInvoked(targetBuffer.getMaxOpsInvoked());
-        targetConn.setMaxOpsPerformed(targetBuffer.getMaxOpsPerformed());
-        targetConn.setReceivePDULength(targetBuffer.getReceivePduLength());
-        targetConn.setSendPDULength(targetBuffer.getSendPduLength());
-        targetConn.setSendBufferSize(targetBuffer.getSendBufferSize());
-        targetConn.setReceiveBufferSize(targetBuffer.getReceiveBufferSize());
-        // Set Timings
-        targetConn.setConnectTimeout(targetTimings.getConnectionTimeout());
-        targetConn.setRequestTimeout(targetTimings.getRequestTimeout());
-        targetConn.setAcceptTimeout(targetTimings.getAcceptTimeout());
-        targetConn.setReleaseTimeout(targetTimings.getReleaseTimeout());
-        targetConn.setSendTimeout(targetTimings.getSendTimeout());
-        targetConn.setResponseTimeout(targetTimings.getResponseTimeout());
-        targetConn.setIdleTimeout(targetTimings.getIdleTimeout());
-        targetConn.setSocketCloseDelay(targetTimings.getSocketCloseDelay());
-
-        return new TransferConnection(sourceConnection, targetConnection);
+        return new TransferConnection(sourceConnection, localAetName, targetAetConnection, targetSecurity, targetTlsContext, targetBuffer, targetTimings);
     }
 
     @Override

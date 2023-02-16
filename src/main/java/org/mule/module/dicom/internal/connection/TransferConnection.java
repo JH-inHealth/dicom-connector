@@ -7,19 +7,64 @@
  */
 package org.mule.module.dicom.internal.connection;
 
+import org.dcm4che3.net.Connection;
+import org.mule.module.dicom.api.parameter.AetConnection;
+import org.mule.module.dicom.api.parameter.ConnectionBuffer;
+import org.mule.module.dicom.api.parameter.ConnectionTimings;
+import org.mule.module.dicom.api.parameter.Security;
+import org.mule.runtime.api.tls.TlsContextFactory;
+
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+
 public final class TransferConnection {
     private final ScuConnection sourceConnection;
     public ScuConnection getSourceConnection() { return sourceConnection; }
-    private final ScuConnection targetConnection;
-    public ScuConnection getTargetConnection() { return targetConnection; }
 
-    public TransferConnection(ScuConnection sourceConnection, ScuConnection targetConnection) {
+    private final String localAetName;
+    private final AetConnection aetConnection;
+    private final Security security;
+    private final TlsContextFactory tlsContextFactory;
+    private final ScheduledExecutorService targetExecutorService;
+    private final ConnectionBuffer targetBuffer;
+    private final ConnectionTimings targetTimings;
+
+    public ScuConnection getTargetConnection() {
+        ScuConnection targetConnection = new ScuConnection(localAetName, aetConnection, security, tlsContextFactory, targetExecutorService);
+        Connection targetConn = targetConnection.getConnection();
+        // Set Buffers
+        targetConn.setMaxOpsInvoked(targetBuffer.getMaxOpsInvoked());
+        targetConn.setMaxOpsPerformed(targetBuffer.getMaxOpsPerformed());
+        targetConn.setReceivePDULength(targetBuffer.getReceivePduLength());
+        targetConn.setSendPDULength(targetBuffer.getSendPduLength());
+        targetConn.setSendBufferSize(targetBuffer.getSendBufferSize());
+        targetConn.setReceiveBufferSize(targetBuffer.getReceiveBufferSize());
+        // Set Timings
+        targetConn.setConnectTimeout(targetTimings.getConnectionTimeout());
+        targetConn.setRequestTimeout(targetTimings.getRequestTimeout());
+        targetConn.setAcceptTimeout(targetTimings.getAcceptTimeout());
+        targetConn.setReleaseTimeout(targetTimings.getReleaseTimeout());
+        targetConn.setSendTimeout(targetTimings.getSendTimeout());
+        targetConn.setResponseTimeout(targetTimings.getResponseTimeout());
+        targetConn.setIdleTimeout(targetTimings.getIdleTimeout());
+        targetConn.setSocketCloseDelay(targetTimings.getSocketCloseDelay());
+        return targetConnection;
+    }
+
+    public TransferConnection(ScuConnection sourceConnection, String localAetName, AetConnection aetConnection, Security security,
+                              TlsContextFactory tlsContextFactory, ConnectionBuffer targetBuffer, ConnectionTimings targetTimings) {
         this.sourceConnection = sourceConnection;
-        this.targetConnection = targetConnection;
+        this.localAetName = localAetName;
+        this.aetConnection = aetConnection;
+        this.security = security;
+        this.tlsContextFactory = tlsContextFactory;
+        this.targetBuffer = targetBuffer;
+        this.targetTimings = targetTimings;
+        this.targetExecutorService = Executors.newSingleThreadScheduledExecutor();
     }
 
     public void disconnect() {
         sourceConnection.disconnect();
-        targetConnection.disconnect();
+        targetExecutorService.shutdown();
     }
 }

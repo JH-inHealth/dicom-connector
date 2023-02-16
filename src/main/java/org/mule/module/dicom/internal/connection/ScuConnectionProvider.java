@@ -13,7 +13,7 @@ import org.mule.module.dicom.api.parameter.ConnectionBuffer;
 import org.mule.module.dicom.api.parameter.ConnectionTimings;
 import org.mule.module.dicom.api.parameter.Security;
 import org.mule.module.dicom.internal.exception.DicomError;
-import org.mule.runtime.api.connection.CachedConnectionProvider;
+import org.mule.runtime.api.connection.ConnectionProvider;
 import org.mule.runtime.api.connection.ConnectionValidationResult;
 import org.mule.runtime.api.lifecycle.Initialisable;
 import org.mule.runtime.api.lifecycle.InitialisationException;
@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 
 @Alias("scu-connection")
-public class ScuConnectionProvider implements CachedConnectionProvider<ScuConnection> {
+public class ScuConnectionProvider implements ConnectionProvider<ScuConnection> {
     private static final Logger log = LoggerFactory.getLogger(ScuConnectionProvider.class);
 
     @Parameter
