@@ -45,7 +45,7 @@ public class MuleCStoreSCP extends BasicCStoreSCP {
             } else {
                 store.process(as, pc, data);
                 status = Status.Success;
-                log.debug("{}: M-WRITE to {}", as, store.getCurrentFileName());
+                log.info("{}: M-WRITE to {}", as, store.getCurrentFileName());
             }
         } catch (Exception e) {
             log.error(as.toString() + ": M-WRITE to " + store.getCurrentFileName() + " - " + e.getMessage(), e);

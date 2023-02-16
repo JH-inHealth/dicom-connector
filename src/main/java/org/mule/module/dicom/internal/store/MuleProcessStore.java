@@ -62,7 +62,7 @@ public class MuleProcessStore implements MuleStore {
         }
         DicomObject dicomObject = new DicomObject(image, pc.getTransferSyntax(), as.getRemoteAET(), as.getRemoteImplClassUID(), as.getRemoteImplVersionName());
         String iuid = AttribUtils.getFirstString(image, new Integer[]{Tag.AffectedSOPInstanceUID, Tag.MediaStorageSOPInstanceUID, Tag.SOPInstanceUID});
-        if (iuid != null) currentFileName = iuid + ".dcm";
+        if (iuid != null) currentFileName = iuid;
         else currentFileName = "";
 
         sourceCallback.handle(Result.<Object, NullType>builder()

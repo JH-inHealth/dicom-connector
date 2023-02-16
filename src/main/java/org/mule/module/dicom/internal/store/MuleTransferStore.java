@@ -58,8 +58,7 @@ public class MuleTransferStore implements MuleStore {
         String tsuid = pc.getTransferSyntax();
         Attributes image = payload.readDataset(tsuid);
         AttribUtils.updateTags(image, changeTags);
-        String iuid = AttribUtils.getFirstString(image, new Integer[]{Tag.AffectedSOPInstanceUID, Tag.MediaStorageSOPInstanceUID, Tag.SOPInstanceUID});
-        currentFileName = iuid + ".dcm";
+        currentFileName = AttribUtils.getFirstString(image, new Integer[]{Tag.AffectedSOPInstanceUID, Tag.MediaStorageSOPInstanceUID, Tag.SOPInstanceUID});
         StoreScu.execute(connection, scuOperationConfig, image, null, iuidList);
     }
 }
