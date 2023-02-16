@@ -8,6 +8,7 @@
 package org.mule.module.dicom.internal.store;
 
 import org.dcm4che3.data.Attributes;
+import org.dcm4che3.data.Tag;
 import org.dcm4che3.net.Association;
 import org.dcm4che3.net.PDVInputStream;
 import org.dcm4che3.net.pdu.PresentationContext;
@@ -26,6 +27,9 @@ public class MuleTransferStore implements MuleStore {
     private final ScuOperationConfig scuOperationConfig;
     private final Map<String, String> changeTags;
     private final List<String> iuidList;
+    private String currentFileName = "";
+    @Override
+    public String getCurrentFileName() { return currentFileName; }
 
     public MuleTransferStore(ScuConnection connection, ScuOperationConfig scuOperationConfig, Map<String, String> changeTags) {
         this.connection = connection;
@@ -54,6 +58,8 @@ public class MuleTransferStore implements MuleStore {
         String tsuid = pc.getTransferSyntax();
         Attributes image = payload.readDataset(tsuid);
         AttribUtils.updateTags(image, changeTags);
+        String iuid = AttribUtils.getFirstString(image, new Integer[]{Tag.AffectedSOPInstanceUID, Tag.MediaStorageSOPInstanceUID, Tag.SOPInstanceUID});
+        currentFileName = iuid + ".dcm";
         StoreScu.execute(connection, scuOperationConfig, image, null, iuidList);
     }
 }
