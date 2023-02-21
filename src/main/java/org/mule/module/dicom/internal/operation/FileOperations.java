@@ -20,9 +20,14 @@ import org.mule.module.dicom.internal.exception.FileErrorsProvider;
 import org.dcm4che3.data.Attributes;
 import org.dcm4che3.data.Tag;
 import org.dcm4che3.io.DicomInputStream;
+import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.api.metadata.DataType;
 import org.mule.runtime.api.metadata.TypedValue;
+import org.mule.runtime.api.store.ObjectStore;
+import org.mule.runtime.api.store.ObjectStoreException;
+import org.mule.runtime.api.store.ObjectStoreManager;
 import org.mule.runtime.extension.api.annotation.Expression;
+import org.mule.runtime.extension.api.annotation.dsl.xml.ParameterDsl;
 import org.mule.runtime.extension.api.annotation.metadata.OutputResolver;
 import org.mule.runtime.extension.api.annotation.metadata.TypeResolver;
 import org.mule.runtime.extension.api.annotation.param.Content;
@@ -32,6 +37,8 @@ import org.mule.runtime.extension.api.annotation.param.Optional;
 import org.mule.runtime.extension.api.annotation.param.display.*;
 import org.mule.runtime.extension.api.exception.ModuleException;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -46,6 +53,9 @@ import static org.mule.runtime.api.meta.model.display.PathModel.Type.DIRECTORY;
 import static org.mule.runtime.api.meta.model.display.PathModel.Type.FILE;
 
 public class FileOperations {
+    @Inject
+    @Named("_muleObjectStoreManager")
+    private ObjectStoreManager storeManager;
 
     @DisplayName("Apply Preamble")
     @Summary("Adds a preamble to a DICOM InputStream (serialized org.dcm4che3.data.Attributes object)")
@@ -104,7 +114,7 @@ public class FileOperations {
         return payload;
     }
 
-    @DisplayName("Read File")
+    @DisplayName("Read from File System")
     @Summary("Reads a DICOM file into an InputStream (serialized org.dcm4che3.data.Attributes object)")
     @Throws(FileErrorsProvider.class)
     @OutputResolver(output = DicomObjectOutputResolver.class)
@@ -130,8 +140,36 @@ public class FileOperations {
         }
     }
 
+    @DisplayName("Read from Object Store")
+    @Summary("Reads a DICOM file into an InputStream (serialized org.dcm4che3.data.Attributes object)")
+    @Throws(FileErrorsProvider.class)
+    @OutputResolver(output = DicomObjectOutputResolver.class)
+    public Object
+    readFileObjectStore(@ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
+                        @DisplayName("Key Name")
+                        String keyName
+    ) {
+        try {
+            if (!objectStore.contains(keyName)) {
+                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("Key Not Found in Object Store"));
+            }
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(objectStore.retrieve(keyName))) {
+                try (DicomInputStream dis = new DicomInputStream(bais)) {
+                    dis.setIncludeBulkData(DicomInputStream.IncludeBulkData.URI);
+                    Attributes fmi = dis.getFileMetaInformation();
+                    Attributes content = dis.readDataset();
+
+                    return new DicomObject(content, fmi.getString(Tag.TransferSyntaxUID), fmi.getString(Tag.SourceApplicationEntityTitle, null),
+                            fmi.getString(Tag.ImplementationClassUID, Implementation.getClassUID()), fmi.getString(Tag.ImplementationVersionName, Implementation.getVersionName()));
+                }
+            }
+        } catch (Exception e) {
+            throw new ModuleException(DicomError.FILE_IO, e);
+        }
+    }
+
     @MediaType(MediaType.TEXT_PLAIN)
-    @DisplayName("Store File")
+    @DisplayName("Store File to File System")
     @Summary("Saves a DICOM InputStream (serialized org.dcm4che3.data.Attributes object) as a DICOM file")
     @Throws(FileErrorsProvider.class)
     public String
@@ -181,5 +219,39 @@ public class FileOperations {
             throw new ModuleException(DicomError.FILE_IO, e);
         }
         return file.toString();
+    }
+
+    @MediaType(MediaType.TEXT_PLAIN)
+    @DisplayName("Store File to Object Store")
+    @Summary("Saves a DICOM InputStream (serialized org.dcm4che3.data.Attributes object) as a DICOM file in an Object Store")
+    @Throws(FileErrorsProvider.class)
+    public String
+    storeFileObjectStore(@ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
+              @DisplayName("DICOM Object")
+              @Optional(defaultValue="#[payload]") @Expression(REQUIRED) @TypeResolver(DicomObjectInputResolver.class)
+              Object dicomObject,
+              @Optional @Content
+              @DisplayName("Change Tags")
+              @Summary("Create or update tags on the image")
+              @Example("#[{\"PatientID\": \"XXXXXXXX\", \"0x67810010\": \"JohnsHopkinsMedicine\", \"0x67811000\": \"${StudyDate}_${AccessionNumber}\"}]")
+              Map<String, String> changeTags
+    ) {
+        if (!(dicomObject instanceof DicomObject)) throw new ModuleException(DicomError.INVALID_DICOM_OBJECT, new RuntimeException(dicomObject.getClass().toString()));
+        DicomObject dicom = (DicomObject)dicomObject;
+        Attributes image = dicom.getContent();
+        AttribUtils.updateTags(image, changeTags);
+        String iuid = AttribUtils.getFirstString(image, new Integer[]{Tag.AffectedSOPInstanceUID, Tag.MediaStorageSOPInstanceUID, Tag.SOPInstanceUID});
+        String cuid = AttribUtils.getFirstString(image, new Integer[]{Tag.AffectedSOPClassUID, Tag.MediaStorageSOPClassUID, Tag.SOPClassUID});
+
+        Attributes fmi = StoreUtils.createFileMetaInformation(iuid, cuid, dicom.getTransferSyntaxUid(),
+                dicom.getImplementationClassUid(), dicom.getImplementationVersionName(), dicom.getSourceApplicationEntityTitle());
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            StoreUtils.writeTo(output, image, fmi);
+            output.flush();
+            objectStore.store(iuid, output.toByteArray());
+        } catch (IOException | ObjectStoreException e) {
+            throw new ModuleException(DicomError.FILE_IO, e);
+        }
+        return iuid;
     }
 }
