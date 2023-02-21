@@ -8,6 +8,7 @@
 package org.mule.module.dicom.internal.operation;
 
 import org.dcm4che3.data.UID;
+import org.dcm4che3.io.DicomInputStream;
 import org.mule.module.dicom.api.content.*;
 import org.mule.module.dicom.api.parameter.*;
 import org.mule.module.dicom.internal.config.ScuType;
@@ -16,13 +17,19 @@ import org.mule.module.dicom.internal.notification.DownloadNotificationAction;
 import org.mule.module.dicom.internal.notification.DownloadNotificationActionProvider;
 import org.mule.module.dicom.internal.store.DicomFileType;
 import org.mule.module.dicom.internal.store.MuleFileStore;
+import org.mule.module.dicom.internal.store.MuleObjectStore;
 import org.mule.module.dicom.internal.util.AttribUtils;
 import org.mule.module.dicom.internal.config.ScuOperationConfig;
 import org.mule.module.dicom.internal.exception.DicomError;
 import org.mule.module.dicom.internal.exception.ScuErrorsProvider;
 import org.dcm4che3.data.Attributes;
 import org.mule.module.dicom.internal.util.StoreUtils;
+import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.api.metadata.TypedValue;
+import org.mule.runtime.api.store.ObjectStore;
+import org.mule.runtime.api.store.ObjectStoreManager;
+import org.mule.runtime.extension.api.annotation.Expression;
+import org.mule.runtime.extension.api.annotation.dsl.xml.ParameterDsl;
 import org.mule.runtime.extension.api.annotation.error.Throws;
 import org.mule.runtime.extension.api.annotation.notification.Fires;
 import org.mule.runtime.extension.api.annotation.param.*;
@@ -30,6 +37,9 @@ import org.mule.runtime.extension.api.annotation.param.display.*;
 import org.mule.runtime.extension.api.exception.ModuleException;
 import org.mule.runtime.extension.api.notification.NotificationEmitter;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,6 +49,10 @@ import java.util.Map;
 import static org.mule.runtime.api.meta.model.display.PathModel.Type.DIRECTORY;
 
 public class ScuOperations {
+    @Inject
+    @Named("_muleObjectStoreManager")
+    private ObjectStoreManager storeManager;
+
     @DisplayName("Echo SCU")
     @Summary("Performs C-ECHO as a Service Class User with a remote Application Entity.")
     @Throws(ScuErrorsProvider.class)
@@ -91,7 +105,7 @@ public class ScuOperations {
         return new FindScuPayload(findScu);
     }
 
-    @DisplayName("Get SCU")
+    @DisplayName("Get SCU to File System")
     @Summary("Performs C-GET as a Service Class User with a remote Application Entity.")
     @Fires(DownloadNotificationActionProvider.class)
     @Throws(ScuErrorsProvider.class)
@@ -126,6 +140,41 @@ public class ScuOperations {
         } catch (IOException e) {
             throw new ModuleException(DicomError.FILE_IO, e);
         }
+        GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
+        if (notificationEmitter != null) notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
+        if (getScu.getHasError()) {
+            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+        }
+        if (getScu.getPayload().isEmpty()) {
+            throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
+        }
+        return new GetScuPayload(getScu);
+    }
+
+    @DisplayName("Get SCU to Object Store")
+    @Summary("Performs C-GET as a Service Class User with a remote Application Entity. Send all DICOM objects to an Object Store.")
+    @Fires(DownloadNotificationActionProvider.class)
+    @Throws(ScuErrorsProvider.class)
+    public GetScuPayload
+    getScuObjectStore(@Connection ScuConnection connection,
+                      @ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
+                      @ParameterGroup(name= StoreSearch.PARAMETER_GROUP)
+                      StoreSearch storeSearch,
+                      @ParameterGroup(name= PresentationContext.PARAMETER_GROUP)
+                      PresentationContext presentationContext,
+                      @ParameterGroup(name= StoreTimings.PARAMETER_GROUP)
+                      StoreTimings timings,
+                      NotificationEmitter notificationEmitter
+    ) {
+        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
+        scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+        scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+        scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+        scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
+        scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
+        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+
+        MuleObjectStore muleStore = new MuleObjectStore(objectStore);
         GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
         if (notificationEmitter != null) notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
         if (getScu.getHasError()) {
@@ -186,6 +235,7 @@ public class ScuOperations {
         ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.STORE);
         scuOperationConfig.setCancelAfter(timings.getCancelAfter());
         List<String> iuidList = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
         try {
             if (storeImage.getDicomObject() != null) {
                 Object dicomObject = storeImage.getDicomObject();
@@ -237,6 +287,8 @@ public class ScuOperations {
                 for (Map.Entry<String, DicomFileType> entry : allFiles.entrySet()) {
                     StoreScu.execute(connection, scuOperationConfig, entry.getKey(), entry.getValue(), changeTags, iuidList);
                 }
+            } else if (storeImage.getObjectStore() != null) {
+                storeScuFromObjectStore(connection, storeImage.getObjectStore(), changeTags, scuOperationConfig, iuidList, keys);
             }
         } catch (IOException e) {
             throw new ModuleException(DicomError.CONNECTIVITY, e);
@@ -250,10 +302,37 @@ public class ScuOperations {
                     for (String fileName : storeImage.getListOfFiles()) {
                         StoreUtils.deleteFolder(fileName);
                     }
+                } else if (storeImage.getObjectStore() != null) {
+                    try {
+                        ObjectStore<byte[]> objectStore = storeImage.getObjectStore();
+                        for (String keyName : keys) {
+                            objectStore.remove(keyName);
+                        }
+                    } catch (Exception ignore) {
+                        // Ignore
+                    }
                 }
             }
         }
         return iuidList;
     }
 
+    private void storeScuFromObjectStore(ScuConnection connection, ObjectStore<byte[]> objectStore, Map<String, String> changeTags, ScuOperationConfig scuOperationConfig, List<String> iuidList, List<String> keys) {
+        try {
+            for (String keyName : objectStore.allKeys()) {
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(objectStore.retrieve(keyName))) {
+                    try (DicomInputStream dis = new DicomInputStream(bais)) {
+                        dis.setIncludeBulkData(DicomInputStream.IncludeBulkData.URI);
+                        Attributes fmi = dis.getFileMetaInformation();
+                        Attributes data = dis.readDataset();
+                        AttribUtils.updateTags(data, changeTags);
+                        StoreScu.execute(connection, scuOperationConfig, data, fmi, iuidList);
+                        keys.add(keyName);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new ModuleException(DicomError.FILE_IO, e);
+        }
+    }
 }
