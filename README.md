@@ -196,7 +196,7 @@ Accepts a Map of query parameters (see below) to perform a query, returning resu
 
 Each result is a Map of Name/Value tags, where the name is a [Tag Identity](#tag-identities) and the value is a [Dicom Value](#dicom-value)
 
-### Get SCU
+### Get SCU to File System
 Performs C-GET as a Service Class User with a remote Application Entity.
 Saves each DICOM file to a folder, returning an ArrayList of their fully qualified filenames.
 
@@ -217,7 +217,38 @@ Saves each DICOM file to a folder, returning an ArrayList of their fully qualifi
 #### Output Payload
 `GetScuPayload` object with the following properties:
 
-| Property Name                  | Description    |
+| Property Name                  | Type           |
+|:-------------------------------|:---------------|
+| messageId                      | `int`          |
+| messageIdBeingRespondedTo      | `int`          |
+| affectedSOPClassUID            | `String`       |
+| numberOfCompletedSuboperations | `int`          |
+| numberOfFailedSuboperations    | `int`          |
+| numberOfRemainingSuboperations | `int`          |
+| numberOfWarningSuboperations   | `int`          |
+| filenames                      | `List<String>` |
+
+### Get SCU to Object Store
+Performs C-GET as a Service Class User with a remote Application Entity.
+Saves each DICOM file to an Object Store as a byte array, returning an ArrayList of their keys (in the `filenames` property).
+
+#### Parameters
+| Tab                  | Group                | Parameter               | Default          | Description                                                                           |
+|:---------------------|:---------------------|:------------------------|:-----------------|:--------------------------------------------------------------------------------------|
+| General              | Basic Settings       | Connector configuration |                  | See [DICOM User](#dicom-user)                                                         |
+| General              | General              | Object store            |                  |                                                                                       |
+| General              | Search               | Search Keys             | `#[payload]`     | See [Search Keys](#search-keys)                                                       |
+| General              | Search               | Storage SOP Classes     | `None`           | See [Storage SOP Classes](#storage-sop-classes)                                       |
+| Presentation Context | Presentation Context | Information Model       | `STUDY_ROOT`     |                                                                                       |
+| Presentation Context | Presentation Context | Retrieve Level          |                  |                                                                                       |
+| Presentation Context | Presentation Context | Transfer Syntax         | `IMPLICIT_FIRST` |                                                                                       |
+| Timings              | Timings              | Store Timeout           | `0`              |                                                                                       |
+| Timings              | Timings              | Cancel After            | `0`              | Milliseconds to wait on each operation before throwing DICOM:CANCELED (0 is infinite) |
+
+#### Output Payload
+`GetScuPayload` object with the following properties:
+
+| Property Name                  | Type           |
 |:-------------------------------|:---------------|
 | messageId                      | `int`          |
 | messageIdBeingRespondedTo      | `int`          |
@@ -246,17 +277,17 @@ Performs C-MOVE as a Service Class User with a remote Application Entity.
 #### Output Payload
 `MoveScuPayload` with the following properties:
 
-| Properties Name                | Description |
-|:-------------------------------|:------------|
-| messageId                      | `int`       |
-| messageIdBeingRespondedTo      | `int`       |
-| affectedSOPClassUID            | `String`    |
-| numberOfCompletedSuboperations | `int`       |
-| numberOfFailedSuboperations    | `int`       |
-| numberOfRemainingSuboperations | `int`       |
-| numberOfWarningSuboperations   | `int`       |
+| Properties Name                | Type     |
+|:-------------------------------|:---------|
+| messageId                      | `int`    |
+| messageIdBeingRespondedTo      | `int`    |
+| affectedSOPClassUID            | `String` |
+| numberOfCompletedSuboperations | `int`    |
+| numberOfFailedSuboperations    | `int`    |
+| numberOfRemainingSuboperations | `int`    |
+| numberOfWarningSuboperations   | `int`    |
 
-### Read File
+### Read File from File System
 Reads a DICOM file into a [DICOM InputStream](#dicom-object).
 
 #### Parameters
@@ -269,7 +300,21 @@ Reads a DICOM file into a [DICOM InputStream](#dicom-object).
 |:--------------|:-------------------|:----------------------------------|
 | `DicomObject` | `application/java` | See [DICOM Object](#dicom-object) |
 
-### Store File
+### Read File from Object Store
+Reads a DICOM file into a [DICOM InputStream](#dicom-object).
+
+#### Parameters
+| Tab      | Group    | Parameter    | Default | Description |
+|:---------|:---------|:-------------|:--------|:------------|
+| General  | General  | Object store |         |             |
+| General  | General  | Key Name     |         |             |
+
+#### Output Payload
+| Data Type     | Media Type         | Description                       |
+|:--------------|:-------------------|:----------------------------------|
+| `DicomObject` | `application/java` | See [DICOM Object](#dicom-object) |
+
+### Store File to File System
 Saves a [DICOM Object](#dicom-object) as a DICOM file
 
 #### Parameters
@@ -279,6 +324,21 @@ Saves a [DICOM Object](#dicom-object) as a DICOM file
 | General  | General       | Filename            | `Random UUID with .dcm extension` |                                   |
 | General  | General       | DICOM Object        | `#[payload]`                      | See [DICOM Object](#dicom-object) |
 | General  | General       | Change Tags         |                                   | See [Change Tags](#change-tags)   |
+
+#### Output Payload
+| Data Type | Media Type         | Description              |
+|:----------|:-------------------|:-------------------------|
+| `String`  | `application/java` | Fully qualified filename |
+
+### Store File to Object Store
+Saves a [DICOM Object](#dicom-object) as a DICOM file (byte array) in an Object Store
+
+#### Parameters
+| Tab      | Group         | Parameter    | Default                           | Description                       |
+|:---------|:--------------|:-------------|:----------------------------------|:----------------------------------|
+| General  | General       | Object store |                                   | Where to save the file            |
+| General  | General       | DICOM Object | `#[payload]`                      | See [DICOM Object](#dicom-object) |
+| General  | General       | Change Tags  |                                   | See [Change Tags](#change-tags)   |
 
 #### Output Payload
 | Data Type | Media Type         | Description              |
@@ -298,6 +358,7 @@ Performs C-STORE as a Service Class User with a remote Application Entity.
 | General  | DICOM Image Source (Choose One) | Filename                |              | File must be DICOM, GZIP of a DICOM, or TAR/GZIP of a collection of DICOM files                                 |
 | General  | DICOM Image Source (Choose One) | Folder Name             |              | Will process all files that are DICOM, GZIP of a DICOM, or TAR/GZIP of a collection of DICOM files              |
 | General  | DICOM Image Source (Choose One) | List of Files           | `None`       | Array must be a Folder Name or Filename of a DICOM, GZIP of a DICOM, or TAR/GZIP of a collection of DICOM files |
+| General  | DICOM Image Source (Choose One) | Object store            |              | All keys from the object store will be extracted                                                                |
 | Timings  | Timings                         | Cancel After            | `0`          | Milliseconds to wait on each operation before throwing DICOM:CANCELED (0 is infinite)                           |
 
 #### Output Payload
