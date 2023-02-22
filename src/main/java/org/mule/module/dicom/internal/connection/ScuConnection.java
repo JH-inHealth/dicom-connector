@@ -192,7 +192,7 @@ public final class ScuConnection {
                 Thread t = Thread.currentThread();
                 t.getUncaughtExceptionHandler().uncaughtException(t, e);
                 t.interrupt();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 log.trace("Ignored exception {}", e.toString());
             }
             this.as = null;
@@ -200,26 +200,28 @@ public final class ScuConnection {
     }
 
     public MuleDimseRSPHandler execute(Attributes data, String iuid) throws IOException {
-        final MuleDimseRSPHandler rspHandler = new MuleDimseRSPHandler(this.as.nextMessageID());
+        if (this.as == null) return null;
+        final Association association = this.as;
+        final MuleDimseRSPHandler rspHandler = new MuleDimseRSPHandler(association.nextMessageID());
         String cuid = scuOperationConfig.getInformationModelCuid();
         try {
             switch (scuOperationConfig.getOperation()) {
                 case MOVE:
                     String aet = this.ae.getAETitle();
-                    this.as.cmove(cuid, 0, data, null, aet, rspHandler);
+                    association.cmove(cuid, 0, data, null, aet, rspHandler);
                     break;
                 case FIND:
-                    this.as.cfind(cuid, 0, data, null, rspHandler);
+                    association.cfind(cuid, 0, data, null, rspHandler);
                     break;
                 case GET:
-                    this.as.cget(cuid, 0, data, null, rspHandler);
+                    association.cget(cuid, 0, data, null, rspHandler);
                     break;
                 case STORE:
                     String tsuid = scuOperationConfig.getTransferSyntaxCodes()[0];
-                    this.as.cstore(cuid, iuid, 0, new DataWriterAdapter(data), tsuid, rspHandler);
+                    association.cstore(cuid, iuid, 0, new DataWriterAdapter(data), tsuid, rspHandler);
                     break;
                 case ECHO:
-                    this.as.cecho(cuid);
+                    association.cecho(cuid);
                     break;
             }
             int cancelAfter = scuOperationConfig.getCancelAfter();
@@ -227,19 +229,23 @@ public final class ScuConnection {
                 this.scheduledCancel = device.schedule(() -> {
                     try {
                         if (log.isWarnEnabled()) log.warn("Canceling C-{}: {} >> {}@{}:{}", scuOperationConfig.getOperation(), ae.getAETitle(), rq.getCalledAET(), remote.getHostname(), remote.getPort());
-                        rspHandler.cancel(ScuConnection.this.as);
+                        rspHandler.cancel(association);
                     } catch (IOException e) {
                         log.error(e.getMessage(), e);
                     }
 
                 }, cancelAfter, TimeUnit.MILLISECONDS);
             }
-            if (this.as.isReadyForDataTransfer()) this.as.waitForOutstandingRSP();
+            if (association.isReadyForDataTransfer()) {
+                association.waitForOutstandingRSP();
+            }
             return rspHandler;
         } catch (InterruptedException e) {
             Thread t = Thread.currentThread();
             t.getUncaughtExceptionHandler().uncaughtException(t, e);
             t.interrupt();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
         }
         return null;
     }
