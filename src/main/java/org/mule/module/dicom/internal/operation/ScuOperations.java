@@ -158,6 +158,7 @@ public class ScuOperations {
     public GetScuPayload
     getScuObjectStore(@Connection ScuConnection connection,
                       @ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
+                      @Summary("Prefix to use for each key name. Each file's Instance UID will be appended following a colon.") String keyNamePrefix,
                       @ParameterGroup(name= StoreSearch.PARAMETER_GROUP)
                       StoreSearch storeSearch,
                       @ParameterGroup(name= PresentationContext.PARAMETER_GROUP)
@@ -174,7 +175,7 @@ public class ScuOperations {
         scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
         scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-        MuleObjectStore muleStore = new MuleObjectStore(objectStore);
+        MuleObjectStore muleStore = new MuleObjectStore(objectStore, keyNamePrefix);
         GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
         if (notificationEmitter != null) notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
         if (getScu.getHasError()) {

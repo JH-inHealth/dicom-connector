@@ -21,6 +21,7 @@ public class MuleObjectStore implements MuleStore {
     private final List<String> fileList;
     private String currentFileName;
     private final ObjectStore<byte[]> objectStore;
+    private final String keyNamePrefix;
 
     @Override
     public String getCurrentFileName() { return currentFileName; }
@@ -36,8 +37,9 @@ public class MuleObjectStore implements MuleStore {
     @Override
     public List<String> getFileList() { return fileList; }
 
-    public MuleObjectStore(ObjectStore<byte[]> objectStore) {
+    public MuleObjectStore(ObjectStore<byte[]> objectStore, String keyNamePrefix) {
         this.objectStore = objectStore;
+        this.keyNamePrefix = keyNamePrefix.endsWith(":") ? keyNamePrefix : keyNamePrefix + ":";
         fileList = new ArrayList<>();
     }
 
@@ -63,8 +65,9 @@ public class MuleObjectStore implements MuleStore {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             StoreUtils.writeTo(output, image, fmi);
             output.flush();
-            objectStore.store(iuid, output.toByteArray());
-            fileList.add(iuid);
+            String keyName = keyNamePrefix + iuid;
+            objectStore.store(keyName, output.toByteArray());
+            fileList.add(keyName);
         } catch (ObjectStoreException e) {
             throw new IOException(e);
         }
