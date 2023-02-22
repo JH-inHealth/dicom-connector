@@ -233,17 +233,18 @@ Performs C-GET as a Service Class User with a remote Application Entity.
 Saves each DICOM file to an Object Store as a byte array, returning an ArrayList of their keys (in the `filenames` property).
 
 #### Parameters
-| Tab                  | Group                | Parameter               | Default          | Description                                                                           |
-|:---------------------|:---------------------|:------------------------|:-----------------|:--------------------------------------------------------------------------------------|
-| General              | Basic Settings       | Connector configuration |                  | See [DICOM User](#dicom-user)                                                         |
-| General              | General              | Object store            |                  |                                                                                       |
-| General              | Search               | Search Keys             | `#[payload]`     | See [Search Keys](#search-keys)                                                       |
-| General              | Search               | Storage SOP Classes     | `None`           | See [Storage SOP Classes](#storage-sop-classes)                                       |
-| Presentation Context | Presentation Context | Information Model       | `STUDY_ROOT`     |                                                                                       |
-| Presentation Context | Presentation Context | Retrieve Level          |                  |                                                                                       |
-| Presentation Context | Presentation Context | Transfer Syntax         | `IMPLICIT_FIRST` |                                                                                       |
-| Timings              | Timings              | Store Timeout           | `0`              |                                                                                       |
-| Timings              | Timings              | Cancel After            | `0`              | Milliseconds to wait on each operation before throwing DICOM:CANCELED (0 is infinite) |
+| Tab                  | Group                | Parameter               | Default          | Description                                                                                   |
+|:---------------------|:---------------------|:------------------------|:-----------------|:----------------------------------------------------------------------------------------------|
+| General              | Basic Settings       | Connector configuration |                  | See [DICOM User](#dicom-user)                                                                 |
+| General              | General              | Object store            |                  |                                                                                               |
+| General              | General              | Key name prefix         |                  | Prefix to use for each key name. Each file's Instance UID will be appended following a colon. |
+| General              | Search               | Search Keys             | `#[payload]`     | See [Search Keys](#search-keys)                                                               |
+| General              | Search               | Storage SOP Classes     | `None`           | See [Storage SOP Classes](#storage-sop-classes)                                               |
+| Presentation Context | Presentation Context | Information Model       | `STUDY_ROOT`     |                                                                                               |
+| Presentation Context | Presentation Context | Retrieve Level          |                  |                                                                                               |
+| Presentation Context | Presentation Context | Transfer Syntax         | `IMPLICIT_FIRST` |                                                                                               |
+| Timings              | Timings              | Store Timeout           | `0`              |                                                                                               |
+| Timings              | Timings              | Cancel After            | `0`              | Milliseconds to wait on each operation before throwing DICOM:CANCELED (0 is infinite)         |
 
 #### Output Payload
 `GetScuPayload` object with the following properties:
@@ -304,10 +305,10 @@ Reads a DICOM file into a [DICOM InputStream](#dicom-object).
 Reads a DICOM file into a [DICOM InputStream](#dicom-object).
 
 #### Parameters
-| Tab      | Group    | Parameter    | Default | Description |
-|:---------|:---------|:-------------|:--------|:------------|
-| General  | General  | Object store |         |             |
-| General  | General  | Key Name     |         |             |
+| Tab      | Group    | Parameter    | Default | Description                  |
+|:---------|:---------|:-------------|:--------|:-----------------------------|
+| General  | General  | Object store |         |                              |
+| General  | General  | Key Name     |         | Key Name in the Object Store |
 
 #### Output Payload
 | Data Type     | Media Type         | Description                       |
@@ -334,11 +335,12 @@ Saves a [DICOM Object](#dicom-object) as a DICOM file
 Saves a [DICOM Object](#dicom-object) as a DICOM file (byte array) in an Object Store
 
 #### Parameters
-| Tab      | Group         | Parameter    | Default                           | Description                       |
-|:---------|:--------------|:-------------|:----------------------------------|:----------------------------------|
-| General  | General       | Object store |                                   | Where to save the file            |
-| General  | General       | DICOM Object | `#[payload]`                      | See [DICOM Object](#dicom-object) |
-| General  | General       | Change Tags  |                                   | See [Change Tags](#change-tags)   |
+| Tab      | Group     | Parameter    | Default      | Description                       |
+|:---------|:----------|:-------------|:-------------|:----------------------------------|
+| General  | General   | Object store |              | Where to save the file            |
+| General  | General   | Key Name     |              | Key Name in the Object Store      |
+| General  | General   | DICOM Object | `#[payload]` | See [DICOM Object](#dicom-object) |
+| General  | General   | Change Tags  |              | See [Change Tags](#change-tags)   |
 
 #### Output Payload
 | Data Type | Media Type         | Description              |

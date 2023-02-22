@@ -146,8 +146,7 @@ public class FileOperations {
     @OutputResolver(output = DicomObjectOutputResolver.class)
     public Object
     readFileObjectStore(@ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
-                        @DisplayName("Key Name")
-                        String keyName
+                        @Summary("Key Name in the Object Store") @DisplayName("Key Name") String keyName
     ) {
         try {
             if (!objectStore.contains(keyName)) {
@@ -227,6 +226,7 @@ public class FileOperations {
     @Throws(FileErrorsProvider.class)
     public String
     storeFileObjectStore(@ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
+              @Summary("Key Name in the Object Store") @DisplayName("Key Name") String keyName,
               @DisplayName("DICOM Object")
               @Optional(defaultValue="#[payload]") @Expression(REQUIRED) @TypeResolver(DicomObjectInputResolver.class)
               Object dicomObject,
@@ -248,7 +248,7 @@ public class FileOperations {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             StoreUtils.writeTo(output, image, fmi);
             output.flush();
-            objectStore.store(iuid, output.toByteArray());
+            objectStore.store(keyName, output.toByteArray());
         } catch (IOException | ObjectStoreException e) {
             throw new ModuleException(DicomError.FILE_IO, e);
         }
