@@ -54,7 +54,7 @@ public class TransferOperations {
 
         ScuOperationConfig scuStoreConfig = new ScuOperationConfig(ScuType.STORE);
         scuStoreConfig.setCancelAfter(timings.getCancelAfter());
-        MuleTransferStore muleStore = new MuleTransferStore(connection.getTargetConnection(), scuStoreConfig, changeTags);
+        MuleTransferStore muleStore = new MuleTransferStore(connection, scuStoreConfig, changeTags);
 
         GetScu getScu = GetScu.execute(connection.getSourceConnection(), scuGetConfig, storeSearch.getSearchKeys(), muleStore);
         if (getScu.getHasError()) {
