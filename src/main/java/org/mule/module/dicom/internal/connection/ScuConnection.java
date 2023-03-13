@@ -38,6 +38,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +55,12 @@ public final class ScuConnection {
     private Association as;
     private ScheduledFuture<?> scheduledCancel;
     private ScuOperationConfig scuOperationConfig;
+    private boolean localExecutor = false;
+
+    public ScuConnection(String localAetName, AetConnection aetConnection, Security security, TlsContextFactory tlsContextFactory) {
+        this(localAetName, aetConnection, security, tlsContextFactory, Executors.newSingleThreadScheduledExecutor());
+        localExecutor = true;
+    }
 
     public ScuConnection(String localAetName, AetConnection aetConnection, Security security, TlsContextFactory tlsContextFactory, ScheduledExecutorService scheduledExecutorService) {
         as = null;
@@ -62,7 +69,7 @@ public final class ScuConnection {
         connection = new Connection();
         connection.setReceivePDULength(16378);
         connection.setSendPDULength(16378);
-        connection.setMaxOpsInvoked(0);
+        connection.setMaxOpsInvoked(1);
         connection.setMaxOpsPerformed(0);
         connection.setPackPDV(true);
         connection.setConnectTimeout(0);
@@ -114,6 +121,22 @@ public final class ScuConnection {
     }
 
     public void disconnect() {
+        if (localExecutor) {
+            ScheduledExecutorService scheduledExecutor = device.getScheduledExecutor();
+            if (scheduledExecutor != null) {
+                scheduledExecutor.shutdown();
+                try {
+                    if (!scheduledExecutor.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+                        scheduledExecutor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    scheduledExecutor.shutdownNow();
+                    Thread t = Thread.currentThread();
+                    t.getUncaughtExceptionHandler().uncaughtException(t, e);
+                    t.interrupt();
+                }
+            }
+        }
         device.setScheduledExecutor(null);
         device.setExecutor(null);
     }
