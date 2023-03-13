@@ -61,16 +61,18 @@ public class ScuOperations {
             @ParameterGroup(name=Timings.PARAMETER_GROUP)
             Timings timings
     ) {
-        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.ECHO);
-        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
-        scuOperationConfig.setSopClassUid(UID.Verification);
-        scuOperationConfig.setTransferSyntaxUid(UID.ImplicitVRLittleEndian);
+        synchronized (this) {
+            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.ECHO);
+            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+            scuOperationConfig.setSopClassUid(UID.Verification);
+            scuOperationConfig.setTransferSyntaxUid(UID.ImplicitVRLittleEndian);
 
-        EchoScu echoScu = EchoScu.execute(connection, scuOperationConfig);
-        if (!echoScu.getSuccess()) {
-            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(echoScu.getErrorMessage()));
+            EchoScu echoScu = EchoScu.execute(connection, scuOperationConfig);
+            if (!echoScu.getSuccess()) {
+                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(echoScu.getErrorMessage()));
+            }
+            return new EchoScuPayload(echoScu);
         }
-        return new EchoScuPayload(echoScu);
     }
 
     @DisplayName("Find SCU")
@@ -85,24 +87,26 @@ public class ScuOperations {
             @ParameterGroup(name=Timings.PARAMETER_GROUP)
             Timings timings
     ) {
-        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.FIND);
-        scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
-        scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-        scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+        synchronized (this) {
+            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.FIND);
+            scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+            scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+            scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-        Map<String, Object> keys = new HashMap<>(tagSearch.getSearchKeys());
-        for (String tagName : tagSearch.getResponseTags()) {
-            if (!keys.containsKey("tagName")) keys.put(tagName, "");
+            Map<String, Object> keys = new HashMap<>(tagSearch.getSearchKeys());
+            for (String tagName : tagSearch.getResponseTags()) {
+                if (!keys.containsKey("tagName")) keys.put(tagName, "");
+            }
+            FindScu findScu = FindScu.execute(connection, scuOperationConfig, keys);
+            if (!findScu.getSuccess()) {
+                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(findScu.getErrorMessage()));
+            }
+            if (findScu.getPayload().isEmpty()) {
+                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-FIND Received 0 Results"));
+            }
+            return new FindScuPayload(findScu);
         }
-        FindScu findScu = FindScu.execute(connection, scuOperationConfig, keys);
-        if (!findScu.getSuccess()) {
-            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(findScu.getErrorMessage()));
-        }
-        if (findScu.getPayload().isEmpty()) {
-            throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-FIND Received 0 Results"));
-        }
-        return new FindScuPayload(findScu);
     }
 
     @DisplayName("Get SCU to File System")
@@ -126,29 +130,32 @@ public class ScuOperations {
            StoreTimings timings,
            NotificationEmitter notificationEmitter
     ) {
-        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
-        scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
-        scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-        scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-        scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
-        scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
-        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+        synchronized (this) {
+            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
+            scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+            scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+            scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+            scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
+            scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
+            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-        MuleFileStore muleStore;
-        try {
-            muleStore = new MuleFileStore(folderName, notificationEmitter, compressFiles);
-        } catch (IOException e) {
-            throw new ModuleException(DicomError.FILE_IO, e);
+            MuleFileStore muleStore;
+            try {
+                muleStore = new MuleFileStore(folderName, notificationEmitter, compressFiles);
+            } catch (IOException e) {
+                throw new ModuleException(DicomError.FILE_IO, e);
+            }
+            GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
+            if (notificationEmitter != null)
+                notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
+            if (getScu.getHasError()) {
+                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+            }
+            if (getScu.getPayload().isEmpty()) {
+                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
+            }
+            return new GetScuPayload(getScu);
         }
-        GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
-        if (notificationEmitter != null) notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
-        if (getScu.getHasError()) {
-            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
-        }
-        if (getScu.getPayload().isEmpty()) {
-            throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
-        }
-        return new GetScuPayload(getScu);
     }
 
     @DisplayName("Get SCU to Object Store")
@@ -167,24 +174,27 @@ public class ScuOperations {
                       StoreTimings timings,
                       NotificationEmitter notificationEmitter
     ) {
-        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
-        scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
-        scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-        scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-        scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
-        scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
-        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+        synchronized (this) {
+            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
+            scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+            scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+            scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+            scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
+            scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
+            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-        MuleObjectStore muleStore = new MuleObjectStore(objectStore, keyNamePrefix);
-        GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
-        if (notificationEmitter != null) notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
-        if (getScu.getHasError()) {
-            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+            MuleObjectStore muleStore = new MuleObjectStore(objectStore, keyNamePrefix);
+            GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
+            if (notificationEmitter != null)
+                notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
+            if (getScu.getHasError()) {
+                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+            }
+            if (getScu.getPayload().isEmpty()) {
+                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
+            }
+            return new GetScuPayload(getScu);
         }
-        if (getScu.getPayload().isEmpty()) {
-            throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
-        }
-        return new GetScuPayload(getScu);
     }
 
     @DisplayName("Move SCU")
@@ -199,19 +209,21 @@ public class ScuOperations {
             @ParameterGroup(name=StoreTimings.PARAMETER_GROUP)
             StoreTimings timings
     ) {
-        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.MOVE);
-        scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
-        scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-        scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-        scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
-        scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
-        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+        synchronized (this) {
+            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.MOVE);
+            scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+            scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+            scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+            scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
+            scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
+            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-        MoveScu moveScu = MoveScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys());
-        if (!moveScu.getSuccess()) {
-            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(moveScu.getErrorMessage()));
+            MoveScu moveScu = MoveScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys());
+            if (!moveScu.getSuccess()) {
+                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(moveScu.getErrorMessage()));
+            }
+            return new MoveScuPayload(moveScu);
         }
-        return new MoveScuPayload(moveScu);
     }
 
     @MediaType("application/java")
@@ -233,89 +245,92 @@ public class ScuOperations {
              @ParameterGroup(name=Timings.PARAMETER_GROUP)
              Timings timings
     ) {
-        ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.STORE);
-        scuOperationConfig.setCancelAfter(timings.getCancelAfter());
-        List<String> iuidList = new ArrayList<>();
-        List<String> keys = new ArrayList<>();
-        try {
-            if (storeImage.getDicomObject() != null) {
-                Object dicomObject = storeImage.getDicomObject();
-                if (!(dicomObject instanceof DicomObject)) throw new ModuleException(DicomError.INVALID_DICOM_OBJECT, new RuntimeException(dicomObject.getClass().toString()));
-                DicomObject dicom = (DicomObject)dicomObject;
+        synchronized (this) {
+            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.STORE);
+            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+            List<String> iuidList = new ArrayList<>();
+            List<String> keys = new ArrayList<>();
+            try {
+                if (storeImage.getDicomObject() != null) {
+                    Object dicomObject = storeImage.getDicomObject();
+                    if (!(dicomObject instanceof DicomObject))
+                        throw new ModuleException(DicomError.INVALID_DICOM_OBJECT, new RuntimeException(dicomObject.getClass().toString()));
+                    DicomObject dicom = (DicomObject) dicomObject;
 
-                // Send the content
-                Attributes data = dicom.getContent();
-                AttribUtils.updateTags(data, changeTags);
-                StoreScu.execute(connection, scuOperationConfig, data, null, iuidList);
-            } else if (storeImage.getFileName() != null) {
-                String fileName = storeImage.getFileName();
-                DicomFileType dft = DicomFileType.parse(fileName);
-                if (DicomFileType.canStore(dft)) {
-                    StoreScu.execute(connection, scuOperationConfig, fileName, dft, changeTags, iuidList);
-                } else {
-                    throw new ModuleException(DicomError.FILE_IO, new RuntimeException("File cannot be read or is an unknown type"));
-                }
-            } else if (storeImage.getFolderName() != null) {
-                String folderName = storeImage.getFolderName();
-                if (!DicomFileType.parse(folderName).equals(DicomFileType.DIRECTORY))
-                    throw new ModuleException(DicomError.FILE_IO, new RuntimeException("Cannot read Folder"));
-                List<java.nio.file.Path> fileList = StoreUtils.getFileList(folderName);
-                for (java.nio.file.Path fileName : fileList) {
-                    DicomFileType dft = DicomFileType.parse(fileName.toString());
-                    if (DicomFileType.canStore(dft)) { // Quietly ignore anything we cannot store
-                        StoreScu.execute(connection, scuOperationConfig, fileName.toString(), dft, changeTags, iuidList);
-                    }
-                }
-            } else if (storeImage.getListOfFiles() != null) {
-                // Flatten the list, since it could be a combination of filenames and/or folders
-                Map<String, DicomFileType> allFiles = new HashMap<>();
-                for (String fileName : storeImage.getListOfFiles()) {
+                    // Send the content
+                    Attributes data = dicom.getContent();
+                    AttribUtils.updateTags(data, changeTags);
+                    StoreScu.execute(connection, scuOperationConfig, data, null, iuidList);
+                } else if (storeImage.getFileName() != null) {
+                    String fileName = storeImage.getFileName();
                     DicomFileType dft = DicomFileType.parse(fileName);
                     if (DicomFileType.canStore(dft)) {
-                        allFiles.put(fileName, dft);
-                    } else if (dft.equals(DicomFileType.DIRECTORY)) {
-                        List<java.nio.file.Path> fileList = StoreUtils.getFileList(fileName);
-                        for (java.nio.file.Path file : fileList) {
-                            DicomFileType dft2 = DicomFileType.parse(file.toString());
-                            if (DicomFileType.canStore(dft2)) { // Quietly ignore anything we cannot store
-                                allFiles.put(file.toString(), dft2);
-                            }
-                        }
+                        StoreScu.execute(connection, scuOperationConfig, fileName, dft, changeTags, iuidList);
                     } else {
                         throw new ModuleException(DicomError.FILE_IO, new RuntimeException("File cannot be read or is an unknown type"));
                     }
-                }
-                for (Map.Entry<String, DicomFileType> entry : allFiles.entrySet()) {
-                    StoreScu.execute(connection, scuOperationConfig, entry.getKey(), entry.getValue(), changeTags, iuidList);
-                }
-            } else if (storeImage.getObjectStore() != null) {
-                storeScuFromObjectStore(connection, storeImage.getObjectStore(), changeTags, scuOperationConfig, iuidList, keys);
-            }
-        } catch (IOException e) {
-            throw new ModuleException(DicomError.CONNECTIVITY, e);
-        } finally {
-            if (deleteSourceFiles) {
-                if (storeImage.getFileName() != null) {
-                    StoreUtils.deleteFolder(storeImage.getFileName());
                 } else if (storeImage.getFolderName() != null) {
-                    StoreUtils.deleteFolder(storeImage.getFolderName());
+                    String folderName = storeImage.getFolderName();
+                    if (!DicomFileType.parse(folderName).equals(DicomFileType.DIRECTORY))
+                        throw new ModuleException(DicomError.FILE_IO, new RuntimeException("Cannot read Folder"));
+                    List<java.nio.file.Path> fileList = StoreUtils.getFileList(folderName);
+                    for (java.nio.file.Path fileName : fileList) {
+                        DicomFileType dft = DicomFileType.parse(fileName.toString());
+                        if (DicomFileType.canStore(dft)) { // Quietly ignore anything we cannot store
+                            StoreScu.execute(connection, scuOperationConfig, fileName.toString(), dft, changeTags, iuidList);
+                        }
+                    }
                 } else if (storeImage.getListOfFiles() != null) {
+                    // Flatten the list, since it could be a combination of filenames and/or folders
+                    Map<String, DicomFileType> allFiles = new HashMap<>();
                     for (String fileName : storeImage.getListOfFiles()) {
-                        StoreUtils.deleteFolder(fileName);
+                        DicomFileType dft = DicomFileType.parse(fileName);
+                        if (DicomFileType.canStore(dft)) {
+                            allFiles.put(fileName, dft);
+                        } else if (dft.equals(DicomFileType.DIRECTORY)) {
+                            List<java.nio.file.Path> fileList = StoreUtils.getFileList(fileName);
+                            for (java.nio.file.Path file : fileList) {
+                                DicomFileType dft2 = DicomFileType.parse(file.toString());
+                                if (DicomFileType.canStore(dft2)) { // Quietly ignore anything we cannot store
+                                    allFiles.put(file.toString(), dft2);
+                                }
+                            }
+                        } else {
+                            throw new ModuleException(DicomError.FILE_IO, new RuntimeException("File cannot be read or is an unknown type"));
+                        }
+                    }
+                    for (Map.Entry<String, DicomFileType> entry : allFiles.entrySet()) {
+                        StoreScu.execute(connection, scuOperationConfig, entry.getKey(), entry.getValue(), changeTags, iuidList);
                     }
                 } else if (storeImage.getObjectStore() != null) {
-                    try {
-                        ObjectStore<byte[]> objectStore = storeImage.getObjectStore();
-                        for (String keyName : keys) {
-                            objectStore.remove(keyName);
+                    storeScuFromObjectStore(connection, storeImage.getObjectStore(), changeTags, scuOperationConfig, iuidList, keys);
+                }
+            } catch (IOException e) {
+                throw new ModuleException(DicomError.CONNECTIVITY, e);
+            } finally {
+                if (deleteSourceFiles) {
+                    if (storeImage.getFileName() != null) {
+                        StoreUtils.deleteFolder(storeImage.getFileName());
+                    } else if (storeImage.getFolderName() != null) {
+                        StoreUtils.deleteFolder(storeImage.getFolderName());
+                    } else if (storeImage.getListOfFiles() != null) {
+                        for (String fileName : storeImage.getListOfFiles()) {
+                            StoreUtils.deleteFolder(fileName);
                         }
-                    } catch (Exception ignore) {
-                        // Ignore
+                    } else if (storeImage.getObjectStore() != null) {
+                        try {
+                            ObjectStore<byte[]> objectStore = storeImage.getObjectStore();
+                            for (String keyName : keys) {
+                                objectStore.remove(keyName);
+                            }
+                        } catch (Exception ignore) {
+                            // Ignore
+                        }
                     }
                 }
             }
+            return iuidList;
         }
-        return iuidList;
     }
 
     private void storeScuFromObjectStore(ScuConnection connection, ObjectStore<byte[]> objectStore, Map<String, String> changeTags, ScuOperationConfig scuOperationConfig, List<String> iuidList, List<String> keys) {
