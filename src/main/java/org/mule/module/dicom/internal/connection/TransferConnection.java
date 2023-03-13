@@ -14,9 +14,6 @@ import org.mule.module.dicom.api.parameter.ConnectionTimings;
 import org.mule.module.dicom.api.parameter.Security;
 import org.mule.runtime.api.tls.TlsContextFactory;
 
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
-
 public final class TransferConnection {
     private final ScuConnection sourceConnection;
     public ScuConnection getSourceConnection() { return sourceConnection; }
@@ -25,12 +22,11 @@ public final class TransferConnection {
     private final AetConnection aetConnection;
     private final Security security;
     private final TlsContextFactory tlsContextFactory;
-    private final ScheduledExecutorService targetExecutorService;
     private final ConnectionBuffer targetBuffer;
     private final ConnectionTimings targetTimings;
 
     public ScuConnection getTargetConnection() {
-        ScuConnection targetConnection = new ScuConnection(localAetName, aetConnection, security, tlsContextFactory, targetExecutorService);
+        ScuConnection targetConnection = new ScuConnection(localAetName, aetConnection, security, tlsContextFactory);
         Connection targetConn = targetConnection.getConnection();
         // Set Buffers
         targetConn.setMaxOpsInvoked(targetBuffer.getMaxOpsInvoked());
@@ -60,11 +56,9 @@ public final class TransferConnection {
         this.tlsContextFactory = tlsContextFactory;
         this.targetBuffer = targetBuffer;
         this.targetTimings = targetTimings;
-        this.targetExecutorService = Executors.newSingleThreadScheduledExecutor();
     }
 
     public void disconnect() {
         sourceConnection.disconnect();
-        targetExecutorService.shutdown();
     }
 }
