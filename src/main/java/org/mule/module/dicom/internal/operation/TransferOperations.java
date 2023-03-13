@@ -45,24 +45,26 @@ public class TransferOperations {
              @ParameterGroup(name=Timings.PARAMETER_GROUP)
              Timings timings
     ) {
-        ScuOperationConfig scuGetConfig = new ScuOperationConfig(ScuType.GET);
-        scuGetConfig.setInformationModel(presentationContext.getInformationModel());
-        scuGetConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-        scuGetConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-        scuGetConfig.setSopClasses(storeSearch.getSopClasses());
-        scuGetConfig.setCancelAfter(timings.getCancelAfter());
+        synchronized (this) {
+            ScuOperationConfig scuGetConfig = new ScuOperationConfig(ScuType.GET);
+            scuGetConfig.setInformationModel(presentationContext.getInformationModel());
+            scuGetConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+            scuGetConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+            scuGetConfig.setSopClasses(storeSearch.getSopClasses());
+            scuGetConfig.setCancelAfter(timings.getCancelAfter());
 
-        ScuOperationConfig scuStoreConfig = new ScuOperationConfig(ScuType.STORE);
-        scuStoreConfig.setCancelAfter(timings.getCancelAfter());
-        MuleTransferStore muleStore = new MuleTransferStore(connection, scuStoreConfig, changeTags);
+            ScuOperationConfig scuStoreConfig = new ScuOperationConfig(ScuType.STORE);
+            scuStoreConfig.setCancelAfter(timings.getCancelAfter());
+            MuleTransferStore muleStore = new MuleTransferStore(connection, scuStoreConfig, changeTags);
 
-        GetScu getScu = GetScu.execute(connection.getSourceConnection(), scuGetConfig, storeSearch.getSearchKeys(), muleStore);
-        if (getScu.getHasError()) {
-            throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+            GetScu getScu = GetScu.execute(connection.getSourceConnection(), scuGetConfig, storeSearch.getSearchKeys(), muleStore);
+            if (getScu.getHasError()) {
+                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+            }
+            if (getScu.getPayload().isEmpty()) {
+                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
+            }
+            return getScu.getPayload();
         }
-        if (getScu.getPayload().isEmpty()) {
-            throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
-        }
-        return getScu.getPayload();
     }
 }
