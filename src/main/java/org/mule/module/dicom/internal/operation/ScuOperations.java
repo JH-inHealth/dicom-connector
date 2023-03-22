@@ -24,6 +24,7 @@ import org.mule.module.dicom.internal.exception.DicomError;
 import org.mule.module.dicom.internal.exception.ScuErrorsProvider;
 import org.dcm4che3.data.Attributes;
 import org.mule.module.dicom.internal.util.StoreUtils;
+import org.mule.runtime.api.lock.LockFactory;
 import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.api.store.ObjectStore;
@@ -45,10 +46,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
 
 import static org.mule.runtime.api.meta.model.display.PathModel.Type.DIRECTORY;
 
 public class ScuOperations {
+    @Inject
+    private LockFactory lockFactory;
     @Inject
     @Named("_muleObjectStoreManager")
     private ObjectStoreManager storeManager;
@@ -165,7 +169,7 @@ public class ScuOperations {
     public GetScuPayload
     getScuObjectStore(@Connection ScuConnection connection,
                       @ParameterDsl(allowInlineDefinition = false) @Expression(ExpressionSupport.NOT_SUPPORTED) ObjectStore<byte[]> objectStore,
-                      @Summary("Prefix to use for each key name. Each file's Instance UID will be appended following a colon.") String keyNamePrefix,
+                      @Summary("Prefix to use for each key name. Each file's Instance UID will be appended, following a colon.") String keyNamePrefix,
                       @ParameterGroup(name= StoreSearch.PARAMETER_GROUP)
                       StoreSearch storeSearch,
                       @ParameterGroup(name= PresentationContext.PARAMETER_GROUP)
@@ -174,26 +178,32 @@ public class ScuOperations {
                       StoreTimings timings,
                       NotificationEmitter notificationEmitter
     ) {
-        synchronized (this) {
-            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
-            scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
-            scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-            scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-            scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
-            scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
-            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+        Lock lock = lockFactory.createLock(keyNamePrefix);
+        lock.lock();
+        try {
+            synchronized (this) {
+                ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
+                scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+                scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+                scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+                scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
+                scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
+                scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-            MuleObjectStore muleStore = new MuleObjectStore(objectStore, keyNamePrefix);
-            GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
-            if (notificationEmitter != null)
-                notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
-            if (getScu.getHasError()) {
-                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+                MuleObjectStore muleStore = new MuleObjectStore(objectStore, keyNamePrefix);
+                GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
+                if (notificationEmitter != null)
+                    notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
+                if (getScu.getHasError()) {
+                    throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+                }
+                if (getScu.getPayload().isEmpty()) {
+                    throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
+                }
+                return new GetScuPayload(getScu);
             }
-            if (getScu.getPayload().isEmpty()) {
-                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
-            }
-            return new GetScuPayload(getScu);
+        } finally {
+            lock.unlock();
         }
     }
 
