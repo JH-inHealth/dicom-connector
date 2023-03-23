@@ -11,9 +11,9 @@ import org.mule.runtime.api.metadata.DataType;
 import org.mule.runtime.extension.api.notification.NotificationActionDefinition;
 
 public enum DownloadNotificationAction implements NotificationActionDefinition<DownloadNotificationAction> {
-    SAVED(DataType.fromType(String.class)),
-
-    FINISHED(DataType.fromType(Boolean.class));
+    SAVED(DataType.STRING),
+    STARTED(DataType.STRING),
+    FINISHED(DataType.BOOLEAN);
 
     private final DataType dataType;
 
