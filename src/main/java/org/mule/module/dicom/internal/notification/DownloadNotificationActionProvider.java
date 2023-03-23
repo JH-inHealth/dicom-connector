@@ -19,6 +19,7 @@ public class DownloadNotificationActionProvider implements NotificationActionPro
     public Set<NotificationActionDefinition> getNotificationActions() {
         HashSet<NotificationActionDefinition> actions = new HashSet<>();
         actions.add(DownloadNotificationAction.SAVED);
+        actions.add(DownloadNotificationAction.STARTED);
         actions.add(DownloadNotificationAction.FINISHED);
         return actions;
     }

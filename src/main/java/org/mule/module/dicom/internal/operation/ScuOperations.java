@@ -134,31 +134,39 @@ public class ScuOperations {
            StoreTimings timings,
            NotificationEmitter notificationEmitter
     ) {
-        synchronized (this) {
-            ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
-            scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
-            scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
-            scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
-            scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
-            scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
-            scuOperationConfig.setCancelAfter(timings.getCancelAfter());
+        Lock lock = (lockFactory != null) ? lockFactory.createLock(folderName) : null;
+        if (lock != null) lock.lock();
+        try {
+            synchronized (this) {
+                if (notificationEmitter != null)
+                    notificationEmitter.fire(DownloadNotificationAction.STARTED, TypedValue.of(folderName));
+                ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
+                scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
+                scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
+                scuOperationConfig.setTransferSyntax(presentationContext.getTransferSyntax());
+                scuOperationConfig.setSopClasses(storeSearch.getSopClasses());
+                scuOperationConfig.setStoreTimeout(timings.getStoreTimeout());
+                scuOperationConfig.setCancelAfter(timings.getCancelAfter());
 
-            MuleFileStore muleStore;
-            try {
-                muleStore = new MuleFileStore(folderName, notificationEmitter, compressFiles);
-            } catch (IOException e) {
-                throw new ModuleException(DicomError.FILE_IO, e);
+                MuleFileStore muleStore;
+                try {
+                    muleStore = new MuleFileStore(folderName, notificationEmitter, compressFiles);
+                } catch (IOException e) {
+                    throw new ModuleException(DicomError.FILE_IO, e);
+                }
+                GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
+                if (notificationEmitter != null)
+                    notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
+                if (getScu.getHasError()) {
+                    throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
+                }
+                if (getScu.getPayload().isEmpty()) {
+                    throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
+                }
+                return new GetScuPayload(getScu);
             }
-            GetScu getScu = GetScu.execute(connection, scuOperationConfig, storeSearch.getSearchKeys(), muleStore);
-            if (notificationEmitter != null)
-                notificationEmitter.fire(DownloadNotificationAction.FINISHED, TypedValue.of(!getScu.getPayload().isEmpty()));
-            if (getScu.getHasError()) {
-                throw new ModuleException(DicomError.REQUEST_ERROR, new RuntimeException(getScu.getErrorMessage()));
-            }
-            if (getScu.getPayload().isEmpty()) {
-                throw new ModuleException(DicomError.NOT_FOUND, new RuntimeException("C-GET Received 0 Files"));
-            }
-            return new GetScuPayload(getScu);
+        } finally {
+            if (lock != null) lock.unlock();
         }
     }
 
@@ -178,10 +186,12 @@ public class ScuOperations {
                       StoreTimings timings,
                       NotificationEmitter notificationEmitter
     ) {
-        Lock lock = lockFactory.createLock(keyNamePrefix);
-        lock.lock();
+        Lock lock = (lockFactory != null) ? lockFactory.createLock(keyNamePrefix) : null;
+        if (lock != null) lock.lock();
         try {
             synchronized (this) {
+                if (notificationEmitter != null)
+                    notificationEmitter.fire(DownloadNotificationAction.STARTED, TypedValue.of(keyNamePrefix));
                 ScuOperationConfig scuOperationConfig = new ScuOperationConfig(ScuType.GET);
                 scuOperationConfig.setInformationModel(presentationContext.getInformationModel());
                 scuOperationConfig.setRetrieveLevel(presentationContext.getRetrieveLevel());
@@ -203,7 +213,7 @@ public class ScuOperations {
                 return new GetScuPayload(getScu);
             }
         } finally {
-            lock.unlock();
+            if (lock != null) lock.unlock();
         }
     }
 
