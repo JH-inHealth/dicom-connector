@@ -124,6 +124,21 @@ Performs C-STORE as a Service Class Provider (Listener).
 |:--------------|:-------------------|:------------------------------|
 | `DicomObject` | `application/java` | [DICOM Object](#dicom-object) |
 
+### Get SCU Results
+Receives each image from the `Get SCU to Flow` operation. See [Get SCU to Flow](#get-scu-to-flow) for more details.
+
+#### Outbound Attributes
+| Name       | Description                                                               |
+|:-----------|:--------------------------------------------------------------------------|
+| action     | `start`, `receive`, or `stop`                                             |
+| seriesName | Value from the `Series name` parameter of the `Get SCU to Flow` operation |
+| iuid       | Instance UID of the DICOM image                                           |
+
+#### Outbound Payload
+| Data Type     | Media Type         | Description                   |
+|:--------------|:-------------------|:------------------------------|
+| `DicomObject` | `application/java` | [DICOM Object](#dicom-object) |
+
 Operations
 ----------
 ### Apply Preamble
@@ -245,6 +260,40 @@ Saves each DICOM file to an Object Store as a byte array, returning an ArrayList
 | Presentation Context | Presentation Context | Transfer Syntax         | `IMPLICIT_FIRST` |                                                                                               |
 | Timings              | Timings              | Store Timeout           | `0`              |                                                                                               |
 | Timings              | Timings              | Cancel After            | `0`              | Milliseconds to wait on each operation before throwing DICOM:CANCELED (0 is infinite)         |
+
+#### Output Payload
+`GetScuPayload` object with the following properties:
+
+| Property Name                  | Type           |
+|:-------------------------------|:---------------|
+| messageId                      | `int`          |
+| messageIdBeingRespondedTo      | `int`          |
+| affectedSOPClassUID            | `String`       |
+| numberOfCompletedSuboperations | `int`          |
+| numberOfFailedSuboperations    | `int`          |
+| numberOfRemainingSuboperations | `int`          |
+| numberOfWarningSuboperations   | `int`          |
+| filenames                      | `List<String>` |
+
+### Get SCU to Flow
+Performs C-GET as a Service Class User with a remote Application Entity.
+When the operation starts, it sends an empty message to the `Get SCU Results` listener with the `attributes.action` of `start`.
+Each DICOM file that is received is sent to the `Get SCU Results` listener with the `attributes.action` of `receive`.
+After the last image is received, it sends an empty message to the `Get SCU Results` listener with the `attributes.action` of `stop`.
+
+#### Parameters
+| Tab                  | Group                | Parameter               | Default          | Description                                                                                                                            |
+|:---------------------|:---------------------|:------------------------|:-----------------|:---------------------------------------------------------------------------------------------------------------------------------------|
+| General              | Basic Settings       | Connector configuration |                  | See [DICOM User](#dicom-user)                                                                                                          |
+| General              | General              | Target flow name        |                  | Name of a Flow that has a [Get SCU Results](#get-scu-results) listener as its source.                                                  |
+| General              | General              | Series name             |                  | A string that is included as an attribute to the target flow. Intended to be used to identify all of the images returned by the C-GET. |
+| General              | Search               | Search Keys             | `#[payload]`     | See [Search Keys](#search-keys)                                                                                                        |
+| General              | Search               | Storage SOP Classes     | `None`           | See [Storage SOP Classes](#storage-sop-classes)                                                                                        |
+| Presentation Context | Presentation Context | Information Model       | `STUDY_ROOT`     |                                                                                                                                        |
+| Presentation Context | Presentation Context | Retrieve Level          |                  |                                                                                                                                        |
+| Presentation Context | Presentation Context | Transfer Syntax         | `IMPLICIT_FIRST` |                                                                                                                                        |
+| Timings              | Timings              | Store Timeout           | `0`              |                                                                                                                                        |
+| Timings              | Timings              | Cancel After            | `0`              | Milliseconds to wait on each operation before throwing DICOM:CANCELED (0 is infinite)                                                  |
 
 #### Output Payload
 `GetScuPayload` object with the following properties:
