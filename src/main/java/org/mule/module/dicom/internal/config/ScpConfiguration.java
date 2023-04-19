@@ -8,6 +8,7 @@
 package org.mule.module.dicom.internal.config;
 
 import org.mule.module.dicom.internal.connection.StoreScpConnectionProvider;
+import org.mule.module.dicom.internal.source.GetScuResults;
 import org.mule.module.dicom.internal.source.StoreScp;
 import org.mule.runtime.extension.api.annotation.Configuration;
 import org.mule.runtime.extension.api.annotation.Sources;
@@ -15,5 +16,5 @@ import org.mule.runtime.extension.api.annotation.connectivity.ConnectionProvider
 
 @Configuration(name="provider")
 @ConnectionProviders(StoreScpConnectionProvider.class)
-@Sources(StoreScp.class)
+@Sources({StoreScp.class, GetScuResults.class})
 public class ScpConfiguration { }

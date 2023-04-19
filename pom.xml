@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>edu.jh.pm</groupId>
     <artifactId>dicom-connector</artifactId>
-    <version>4.2.5</version>
+    <version>4.2.6</version>
     <packaging>mule-extension</packaging>
     <name>Dicom Extension</name>
 
@@ -26,7 +26,7 @@
         <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/dcm4che-core/maven-metadata.xml -->
         <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/dcm4che-net/maven-metadata.xml -->
         <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/tool/dcm4che-tool-common/maven-metadata.xml -->
-        <dcm4che.version>5.29.1</dcm4che.version>
+        <dcm4che.version>5.29.2</dcm4che.version>
     </properties>
 
     <dependencies>
@@ -59,7 +59,7 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.9.1</version>
+            <version>5.9.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
