@@ -555,7 +555,7 @@ Add repository locations
     <repository>
         <id>dcm4che</id>
         <name>DCM4Che Repository</name>
-        <url>https://dcm4che.org/maven2/</url>
+        <url>https://www.dcm4che.org/maven2/</url>
     </repository>
     <repository>
         <id>github</id>
