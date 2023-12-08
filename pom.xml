@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>edu.jh.pm</groupId>
     <artifactId>dicom-connector</artifactId>
-    <version>4.2.6</version>
+    <version>4.2.7</version>
     <packaging>mule-extension</packaging>
     <name>Dicom Extension</name>
 
@@ -26,7 +26,7 @@
         <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/dcm4che-core/maven-metadata.xml -->
         <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/dcm4che-net/maven-metadata.xml -->
         <!-- DICOM Library https://dcm4che.org/maven2/org/dcm4che/tool/dcm4che-tool-common/maven-metadata.xml -->
-        <dcm4che.version>5.29.2</dcm4che.version>
+        <dcm4che.version>5.31.1</dcm4che.version>
     </properties>
 
     <dependencies>
@@ -68,7 +68,7 @@
         <repository>
             <id>dcm4che</id>
             <name>DCM4Che Repository</name>
-            <url>https://dcm4che.org/maven2/</url>
+            <url>https://www.dcm4che.org/maven2/</url>
         </repository>
         <repository>
             <id>mulesoft-releases</id>
